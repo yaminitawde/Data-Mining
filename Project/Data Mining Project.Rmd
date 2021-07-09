@@ -1,0 +1,1099 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+## Final Individual Case Study
+
+## Boston Housing data
+
+```{r}
+library(MASS)
+data(Boston)
+set.seed(14023799)
+```
+
+```{r}
+sample_index <- sample(nrow(Boston),nrow(Boston)*0.80)
+Boston_train <- Boston[sample_index,]
+Boston_test <- Boston[-sample_index,]
+```
+
+**Exploratory data analysis**
+```{r}
+dim(Boston)
+```
+
+```{r}
+summary(Boston)
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(Boston, aes(medv))+
+  geom_histogram(aes(y=stat(density)), bin =10) +
+  geom_density(col = "red") 
+```
+
+```{r}
+library(ggplot2)
+ggplot(data = Boston, aes(x ="",y = medv)) +
+       stat_boxplot(geom = "errorbar",      # Error bars
+                    width = 0.2) +
+       geom_boxplot(fill = "#4271AE",       # Box color
+                    outlier.colour = "red", # Outliers color
+                    alpha = 0.9) +          # Box color transparency
+       ggtitle("Boxplot of target variable") +
+       coord_flip()
+```
+
+```{r}
+library(corrplot)
+corrplot(cor(Boston), type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+```
+
+#### Linear Regression
+
+
+```{r}
+nullmodel=lm(medv~1, data=Boston_train)
+fullmodel=lm(medv~., data=Boston_train)
+AIC(fullmodel)
+BIC(fullmodel)
+(summary(fullmodel)$sigma)^2
+```
+
+```{r}
+## Backward AIC
+model_back_aic <- step(fullmodel,direction='backward')
+AIC(model_back_aic)
+BIC(model_back_aic)
+(summary(model_back_aic)$sigma)^2
+```
+
+```{r}
+# Forward AIC
+model_for_aic <- step(nullmodel, scope=list(lower=nullmodel, upper=fullmodel), direction='forward')
+AIC(model_for_aic)
+BIC(model_for_aic)
+(summary(model_for_aic)$sigma)^2
+```
+
+```{r}
+# Stepwise Both direction
+model_step_s <- step(nullmodel, scope=list(lower=nullmodel, upper=fullmodel), direction='both')
+AIC(model_step_s)
+BIC(model_step_s)
+(summary(model_step_s)$sigma)^2
+```
+
+```{r}
+## Backward BIC
+model_back_bic <- step(fullmodel,direction='backward', k = log(nrow(Boston)))
+AIC(model_back_bic)
+BIC(model_back_bic)
+(summary(model_back_bic)$sigma)^2
+```
+
+```{r}
+#Forward BIC
+model_for_bic <- step(nullmodel, scope=list(lower=nullmodel, upper=fullmodel), k = log(nrow(Boston)), direction='forward')
+AIC(model_for_bic)
+BIC(model_for_bic)
+(summary(model_for_bic)$sigma)^2
+```
+
+```{r}
+# Stepwise BIC
+model_step_bic <- step(nullmodel, scope=list(lower=nullmodel, upper=fullmodel), k =log(nrow(Boston)) ,direction='both')
+AIC(model_step_bic)
+BIC(model_step_bic)
+(summary(model_step_bic)$sigma)^2
+```
+
+```{r}
+
+# cv_lasso_fit <- cv.glmnet(x = as.matrix(Boston_train[, -c(which(colnames(Boston_train)=='medv'))]), y = Boston_train$medv, type.measure='mse', keep=TRUE, alpha = 1)
+# bestlam <- cv_lasso_fit$lambda.min
+# bestlam
+```
+
+
+```{r}
+library(glmnet)
+lasso_fit <- glmnet(x = as.matrix(Boston[, -c(which(colnames(Boston)=='medv'))]), y = Boston$medv, alpha = 1)
+```
+
+
+```{r}
+coef(lasso_fit,s= 0.5)
+library(plotmo)
+plot_glmnet(lasso_fit, label=TRUE)
+```
+
+
++ We get lowest MSE value of 23.86202 from Backward AIC, Backward BIC,
+Forward AIC and Stepwise AIC with similar lowest AIC  value of 2441.925 and BIC value of 2493.943
+So the final model selected is $medv \sim crim + zn + chas + nox + rm + dis + rad + tax + ptratio + black + lstat$
+
+```{r}
+lasso_pred <- predict(lasso_fit, as.matrix(Boston_train[, -c(which(colnames(Boston)=='medv'))]), s = 1)
+lasso.resid = lasso_pred - Boston_train$medv
+mean(lasso.resid^2)
+```
+```{r}
+new_lasso_fit <- lm(medv ~ crim+ chas+ nox+ rm+dis+ptratio+black+ lstat, data = Boston_train)
+AIC(new_lasso_fit)
+BIC(new_lasso_fit)
+```
+
+
+
+```{r}
+summary(model_back_aic)
+```
+
+#### MSPE 
+
+```{r}
+pi <- predict(model_back_aic, Boston_test)
+mean((pi - Boston_test$medv)^2) #MSE
+```
+
+#### Cross Validation
+
+```{r}
+library(boot)
+model_full <- glm(medv~., data = Boston)
+cv.glm(data = Boston, glmfit = model_full, K = 5)$delta[2]
+```
++ The MSE value using cross validation is 22.79762 which is higher as compared to the MSE of the final model 18.43462.
+
+
+#### CART regression tree 
+
+```{r}
+library(rpart)
+library(rpart.plot)
+boston_rpart <- rpart(formula = medv ~ ., data = Boston_train)
+```
+
+```{r}
+boston_test_pred_rpart = predict(boston_rpart, Boston_test)
+mean((boston_test_pred_rpart - Boston_test$medv)^2)
+```
++ The tree model’s out-of-sample MSPE is 16.97644 whereas that of final linear regression model selected is  18.43462. So the out-of-sample performance is better for tree model as it has lower MSPE value
+
+### Changing seed
+
+```{r}
+set.seed(2810)
+```
+
+```{r}
+sample_index <- sample(nrow(Boston),nrow(Boston)*0.80)
+Boston_train <- Boston[sample_index,]
+Boston_test <- Boston[-sample_index,]
+```
+
+
+```{r}
+nullmodel=lm(medv~1, data=Boston_train)
+fullmodel=lm(medv~., data=Boston_train)
+AIC(fullmodel)
+BIC(fullmodel)
+(summary(fullmodel)$sigma)^2
+```
+
+```{r}
+## Backward AIC
+model_back_aic <- step(fullmodel,direction='backward')
+AIC(model_back_aic)
+BIC(model_back_aic)
+(summary(model_back_aic)$sigma)^2
+```
+```{r}
+# Forward AIC
+model_for_aic <- step(nullmodel, scope=list(lower=nullmodel, upper=fullmodel), direction='forward')
+AIC(model_for_aic)
+BIC(model_for_aic)
+(summary(model_for_aic)$sigma)^2
+```
+
+```{r}
+# Stepwise Both direction
+model_step_s <- step(nullmodel, scope=list(lower=nullmodel, upper=fullmodel), direction='both')
+AIC(model_step_s)
+BIC(model_step_s)
+(summary(model_step_s)$sigma)^2
+```
+
+```{r}
+## Backward BIC
+model_back_bic <- step(fullmodel,direction='backward', k = log(nrow(Boston)))
+AIC(model_back_bic)
+BIC(model_back_bic)
+(summary(model_back_bic)$sigma)^2
+```
+
+```{r}
+#Forward BIC
+model_for_bic <- step(nullmodel, scope=list(lower=nullmodel, upper=fullmodel), k = log(nrow(Boston)), direction='forward')
+AIC(model_for_bic)
+BIC(model_for_bic)
+(summary(model_for_bic)$sigma)^2
+```
+
+```{r}
+model_step_bic <- step(nullmodel, scope=list(lower=nullmodel, upper=fullmodel), k =log(nrow(Boston)) ,direction='both')
+AIC(model_step_bic)
+BIC(model_step_bic)
+(summary(model_step_bic)$sigma)^2
+```
+```{r}
+# library(glmnet)
+# cv_lasso_fit <- cv.glmnet(x = as.matrix(Boston_train[, -c(which(colnames(Boston_train)=='medv'))]), y = Boston_train$medv, type.measure='mse', keep=TRUE, alpha = 1)
+# bestlam <- cv_lasso_fit$lambda.min
+# bestlam
+```
+
+
+```{r}
+lasso_fit <- glmnet(x = as.matrix(Boston[, -c(which(colnames(Boston)=='medv'))]), y = Boston$medv, alpha = 1)
+```
+
+
+```{r}
+coef(lasso_fit,s= 0.5)
+library(plotmo)
+plot_glmnet(lasso_fit, label=TRUE)
+```
+
+```{r}
+lasso_pred <- predict(lasso_fit, as.matrix(Boston_train[, -c(which(colnames(Boston)=='medv'))]), s = 1)
+lasso.resid = lasso_pred - Boston_train$medv
+mean(lasso.resid^2)
+```
+
+```{r}
+new_lasso_fit <- lm(medv ~  crim +chas+ nox+ rm+dis+ ptratio+ black + lstat, data = Boston_train)
+AIC(new_lasso_fit)
+BIC(new_lasso_fit)
+```
+
+
++The lowest MSE value of 20.872 is for Backward AIC, Backward BIC, Forward AIC, and Stepwise AIC with same lowest AIC value of 2387.848 and BIC value of 2439.867. So, we can select any of the model from them.
+So the final model selected is $medv \sim crim + zn + chas + nox + rm + dis + rad + tax + ptratio + black + lstat$
+
+
+
+```{r}
+summary(model_back_aic)
+```
+
+#### MSPE 
+
+```{r}
+pi <- predict(model_back_aic, Boston_test)
+mean((pi - Boston_test$medv)^2) #MSE
+```
+
+#### Cross Validation
+
+```{r}
+library(boot)
+model_full <- glm(medv~., data = Boston)
+cv.glm(data = Boston, glmfit = model_full, K = 5)$delta[2]
+```
++ The MSE value using cross validation is 24.507 which is lower as compared to the MSE of the final model 30.467 which means cross validation gives better results.
+
+#### CART regression tree 
+
+```{r}
+library(rpart)
+library(rpart.plot)
+boston_rpart <- rpart(formula = medv ~ ., data = Boston_train)
+```
+
+
+```{r}
+prp(boston_rpart,digits = 4, extra = 1)
+```
+
+```{r}
+boston_test_pred_rpart = predict(boston_rpart, Boston_test)
+mean((boston_test_pred_rpart - Boston_test$medv)^2)
+```
++ The tree model’s out-of-sample MSPE is 27.475 whereas that of linear regression with all models is 30.467 . So the out-of-sample performance is better for tree model as it has lower MSPE value.
+
+## German Data
+
+```{r}
+German <- read.csv(file = "german.csv", header=F)
+colnames(German) <- c("status_chk_acct", "duration_month", "credit_history", "purpose", "credit_amount", "saving_acct", "present_emp", "installment_rate", "sex", "other_debtor", "present_residence", "property", "age", "other_install", "housing", "n_credits", "job", "no_people", "telephone", "foreign_worker", "response")
+head(German)
+German$response <- German$response - 1
+German$response <- as.factor(German$response)
+```
+
+
+```{r}
+set.seed(14023799)
+
+sample_index <- sample(nrow(German),nrow(German)*0.80)
+German_train <- German[sample_index,]
+German_test <- German[-sample_index,]
+```
+
+### EDA
+```{r}
+summary(German)
+```
+
+```{r}
+ggplot(German, aes(age))+
+  geom_histogram(aes(y=stat(density))) +
+  geom_density(col = "red") 
+```
+
+
+
+```{r}
+pct <- round(table(German$response) / length(German$response) * 100, 1)
+#labs <- c("0", "1")
+labs <- pct
+labs <- paste(labs,"%",sep = "")
+pie(table(German$response),labels = labs, col = c("green","red"),
+    main = "Percent distribution of reponse")
+legend("topright", c("0","1"), cex = 0.8,
+   fill = c("green","red"))
+
+```
+
+
+```{r}
+logit_model <- glm(response ~. , family = binomial, data = German_train)
+probit_model <- glm(response ~. , family = binomial(link=probit), data = German_train)
+cloglog_model <- glm(response ~ ., family = binomial(link=cloglog), data = German_train)
+```
+
+```{r}
+AIC(logit_model)
+AIC(probit_model)
+AIC(cloglog_model)
+```
+
+```{r}
+BIC(logit_model)
+BIC(probit_model)
+BIC(cloglog_model)
+```
+
+
+```{r}
+ dev_log <- logit_model$deviance
+dev_probit <- probit_model$deviance 
+dev_clog <- cloglog_model$deviance
+dev_log
+dev_probit
+dev_clog
+```
+
+```{r}
+logit.predprob<-predict(logit_model,type="response")
+probit.predprob<-predict(probit_model,type="response")
+clog.predprob<-predict(cloglog_model,type="response")
+```
+
+
+```{r}
+library(pROC)
+AUC_logit <- auc(German_train$response, logit.predprob)
+AUC_logit
+AUC_probit <- auc(German_train$response,probit.predprob)
+AUC_probit
+AUC_clog <- auc(German_train$response, clog.predprob)
+AUC_clog
+```
+
+
+### Stepwise
+
+```{r}
+german_fullmodel <- glm(response~., family=binomial, data=German_train)
+german_nullmodel <- glm(response~1, family=binomial, data=German_train)
+```
+
+```{r}
+model1_back <- step(german_fullmodel, trace = 0) 
+model2_back <- step(german_fullmodel, k = log(nrow(German_train)), trace = 0)
+
+model3_forward <- step(german_nullmodel, scope=list(lower=german_nullmodel, upper=german_fullmodel), direction="forward", trace = 0)
+
+model4_forward <- step(german_nullmodel, scope=list(lower=german_nullmodel, upper=german_fullmodel), k = log(nrow(German_train)), direction="forward", trace = 0)
+```
+
+
+```{r}
+german_model_AICs <- c(AIC(model1_back), AIC(model2_back),
+                       AIC(model3_forward), AIC(model4_forward))
+
+german_model_BICs <- c(BIC(model1_back), BIC(model2_back), 
+                       BIC(model3_forward), BIC(model4_forward))
+
+selection_method <- c("AIC Backward Elim.", "BIC Backward Elim.", 
+                      "AIC Forward Select.", "BIC Forward Select." )
+
+german_model_results <- data.frame(cbind(selection_method, german_model_AICs, german_model_BICs))
+german_model_results
+```
+
++ The model using Backward AIC and Forward AIC  gives lowest AIC value of 794.963 and residual deviance of 724.96 so we select it as our final model
+
+```{r}
+final_model_prediction <- predict(model1_back,type="response")  
+
+library(fields)
+library(verification)
+roc.plot(German_train$response == "1", final_model_prediction)$roc.vol
+```
+```{r}
+library(pROC)
+AUC_value <- auc(German_train$response, final_model_prediction)
+AUC_value
+```
+
+```{r}
+summary(model1_back)
+```
+
+```{r}
+library(ROCR)
+pred <- prediction(final_model_prediction,German_train$response)
+perf <- performance(pred,"tpr","fpr")
+plot(perf,colorize=TRUE)
+```
+
+
+```{r}
+summary(model1_back)$deviance
+```
+
+
+
+### Lasso selection
+
+```{r}
+dummy <- model.matrix(~ ., data = German)
+credit_lasso <- data.frame(dummy[,-1])
+```
+
+
+```{r}
+credit_train_Y = credit_lasso[sample_index, "response1"]
+credit_test_Y = credit_lasso[sample_index, "response1"]
+credit_train_X = as.matrix(subset( credit_lasso, select = -response1 )[sample_index,])
+credit_test_X = as.matrix(subset( credit_lasso, select = -response1 )[sample_index,])
+
+
+
+
+library(glmnet)
+credit_lasso <- glmnet(x=credit_train_X, y=credit_train_Y, family = "binomial")
+
+credit_lasso_cv<- cv.glmnet(x=credit_train_X, y=credit_train_Y, family = "binomial", type.measure = "class")
+plot(credit_lasso_cv)
+```
+
+
+```{r}
+# pred_lasso_train <- predict(credit_lasso, newx=credit_train_X, s=credit_lasso_cv$lambda.1se, type = "response")
+# pred_values <- pored_lasso_train - credit_train_X$response
+```
+
+#### Misclassification rate for in-sample prediction
+
+```{r}
+asymmetric_cost <- function(r, pi, pcut){
+  weight1 <- 5
+  weight0 <- 1
+  c1 <- (r==1)&(pi<pcut) 
+  c0 <-(r==0)&(pi>pcut)
+  return(mean(weight1*c1+weight0*c0))
+}
+
+pcut <- 1/6
+
+asymmetric_cost(r = German_train$response, pi = final_model_prediction, pcut)
+```
+
+```{r}
+German_train$predicted <-  ifelse(final_model_prediction > pcut,1,0)
+table(predicted = German_train$predicted , actual = German_train$response)
+```
+
+
+```{r}
+mean(German_train$response!= German_train$predicted)
+```
+
++ The misclassification rate is 0.3525 for in sample prediction
+
+
+
+### Out of sample performance 
+
+```{r}
+out_sample_prediction <- predict(model1_back, newdata = German_test, type="response")
+roc.plot(German_test$response == "1",out_sample_prediction)$roc.vol
+```
+```{r}
+pred <- prediction(out_sample_prediction,German_test$response)
+perf <- performance(pred,"tpr","fpr")
+plot(perf,colorize=TRUE)
+```
+
+
+##### Out of sample AUC  0.79
+
+#### Asymmetric misclassification rate 
+```{r}
+asymmetric_cost(r = German_test$response, pi=out_sample_prediction,pcut)
+```
++ The asymmetric cost is  0.495
+
+```{r}
+German_test$predicted_values <-  ifelse(out_sample_prediction > pcut,1,0)
+table(predicted = German_test$predicted_values , actual = German_test$response)
+```
+
+
+```{r}
+mean(German_test$predicted_values != German_test$response)
+```
+
++ The misclassification rate is  0.335
+
+#### Cross Validation
+
+```{r}
+costfunc  <- function(obs, pred.p){
+    weight1 <- 5   # define the weight for "true=1 but pred=0" (FN)
+    weight0 <- 1    # define the weight for "true=0 but pred=1" (FP)
+    pcut <- 1/6
+    c1 <- (obs==1)&(pred.p < pcut)    # count for "true=1 but pred=0"   (FN)
+    c0 <- (obs==0)&(pred.p >= pcut)   # count for "true=0 but pred=1"   (FP)
+    cost <- mean(weight1*c1 + weight0*c0)  # misclassification with weight
+    return(cost) 
+}
+
+
+model_full_german <- glm(response~., family = binomial , data = German)
+cv_glm_german <- cv.glm(data = German, glmfit = model_full_german,  cost=costfunc,K = 5)
+cv_glm_german$delta[2]
+```
+
+
+```{r}
+pred_german <- predict(model_full_german,newdata= German, type ="response")
+roc.plot(German$response == "1",pred_german)$roc.vol
+```
+
+```{r}
+library(ROCR)
+pred = prediction(pred_german, German$response)
+perf = performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+
+
+
+
+
+
+## CART
+```{r}
+german_rpart <- rpart(formula = response ~ ., data = German_train, method = "class")
+prp(german_rpart)
+```
+
+```{r}
+plotcp(german_rpart)
+```
+
+
+```{r}
+german_prune <- prune(german_rpart, cp =0.024)
+```
+
+
+
+```{r}
+prp(german_prune)
+```
+
+
+#### AUC, ROC and misclassification of Classification tree
+
+```{r}
+# In sample
+credit_train.pred.tree1<- predict(german_rpart, German_train, type="class")
+table(German_train$response, credit_train.pred.tree1, dnn=c("Truth","Predicted"))
+```
+
+```{r}
+mean(German_train$response!= credit_train.pred.tree1)
+```
+
+```{r}
+#Out of sample
+german_rpart <- rpart(formula = response ~ . , data =German_train, method = "class", parms = list(loss=matrix(c(0,5,1,0), nrow = 2)))
+# 
+# credit_test_prob_rpart <- predict(german_rpart,German_test, type="class")
+# table(German_test$response, credit_test_prob_rpart, dnn=c("Truth","Predicted"))
+```
+
+```{r}
+#Out of sample missclassification
+# mean(German_test$response!= credit_test_prob_rpart)
+```
+```{r}
+# library(ROCR)
+# credit_test_prob_rpart = predict(german_rpart, German_test, type="prob")
+# pred = prediction(credit_test_prob_rpart[,2], German_test$response)
+# perf = performance(pred, "tpr", "fpr")
+# plot(perf, colorize=TRUE)
+```
+
+```{r}
+# slot(performance(pred, "auc"), "y.values")[[1]]
+```
+
+
+### Changing seed
+
+```{r}
+set.seed(14023799)
+sample_index <- sample(nrow(German),nrow(German)*0.70)
+German_train <- German[sample_index,]
+German_test <- German[-sample_index,]
+```
+
+
+```{r}
+logit_model <- glm(response ~. , family = binomial, data = German_train)
+probit_model <- glm(response ~. , family = binomial(link=probit), data = German_train)
+cloglog_model <- glm(response ~ ., family = binomial(link=cloglog), data = German_train)
+```
+
+```{r}
+AIC(logit_model)
+AIC(probit_model)
+AIC(cloglog_model)
+```
+
+```{r}
+BIC(logit_model)
+BIC(probit_model)
+BIC(cloglog_model)
+```
+
+
+```{r}
+ dev_log <- logit_model$deviance
+dev_probit <- probit_model$deviance 
+dev_clog <- cloglog_model$deviance
+dev_log
+dev_probit
+dev_clog
+```
+
+```{r}
+logit.predprob<-predict(logit_model,type="response")
+probit.predprob<-predict(probit_model,type="response")
+clog.predprob<-predict(cloglog_model,type="response")
+```
+
+
+```{r}
+library(pROC)
+AUC_logit <- auc(German_train$response, logit.predprob)
+AUC_logit
+AUC_probit <- auc(German_train$response,probit.predprob)
+AUC_probit
+AUC_clog <- auc(German_train$response, clog.predprob)
+AUC_clog
+```
+
+
+### Stepwise
+
+```{r}
+german_fullmodel <- glm(response~., family=binomial, data=German_train)
+german_nullmodel <- glm(response~1, family=binomial, data=German_train)
+```
+
+```{r}
+model1_back <- step(german_fullmodel, trace = 0) 
+model2_back <- step(german_fullmodel, k = log(nrow(German_train)), trace = 0)
+
+model3_forward <- step(german_nullmodel, scope=list(lower=german_nullmodel, upper=german_fullmodel), direction="forward", trace = 0)
+
+model4_forward <- step(german_nullmodel, scope=list(lower=german_nullmodel, upper=german_fullmodel), k = log(nrow(German_train)), direction="forward", trace = 0)
+```
+
+
+```{r}
+german_model_AICs <- c(AIC(model1_back), AIC(model2_back),
+                       AIC(model3_forward), AIC(model4_forward))
+
+german_model_BICs <- c(BIC(model1_back), BIC(model2_back), 
+                       BIC(model3_forward), BIC(model4_forward))
+
+selection_method <- c("AIC Backward Elim.", "BIC Backward Elim.", 
+                      "AIC Forward Select.", "BIC Forward Select." )
+
+german_model_results <- data.frame(cbind(selection_method, german_model_AICs, german_model_BICs))
+german_model_results
+```
+
++ The model using Backward AIC and Forward AIC  gives lowest AIC value of 794.963 and residual deviance of 724.96 so we select it as our final model
+
+
+
+```{r}
+final_model_prediction <- predict(model1_back,type="response")  
+
+library(fields)
+library(verification)
+roc.plot(German_train$response == "1", final_model_prediction)$roc.vol
+```
+
+```{r}
+library(pROC)
+AUC_value <- auc(German_train$response, final_model_prediction)
+AUC_value
+```
+
+
+
+```{r}
+library(ROCR)
+pred <- prediction(final_model_prediction,German_train$response)
+perf <- performance(pred,"tpr","fpr")
+plot(perf,colorize=TRUE)
+```
+
+
+```{r}
+summary(model1_back)$deviance
+```
+
+
+
+### Lasso selection
+
+```{r}
+dummy <- model.matrix(~ ., data = German)
+credit_lasso <- data.frame(dummy[,-1])
+```
+
+
+```{r}
+credit_train_Y = credit_lasso[sample_index, "response1"]
+credit_test_Y = credit_lasso[sample_index, "response1"]
+credit_train_X = as.matrix(subset( credit_lasso, select = -response1 )[sample_index,])
+credit_test_X = as.matrix(subset( credit_lasso, select = -response1 )[sample_index,])
+
+
+
+
+library(glmnet)
+credit_lasso <- glmnet(x=credit_train_X, y=credit_train_Y, family = "binomial")
+
+credit_lasso_cv<- cv.glmnet(x=credit_train_X, y=credit_train_Y, family = "binomial", type.measure = "class")
+plot(credit_lasso_cv)
+```
+
+
+
+
+#### Misclassification rate for in-sample prediction
+
+```{r}
+asymmetric_cost <- function(r, pi, pcut){
+  weight1 <- 5
+  weight0 <- 1
+  c1 <- (r==1)&(pi<pcut) 
+  c0 <-(r==0)&(pi>pcut)
+  return(mean(weight1*c1+weight0*c0))
+}
+
+pcut <- 1/6
+
+asymmetric_cost(r = German_train$response, pi = final_model_prediction, pcut)
+```
+
+```{r}
+German_train$predicted <-  ifelse(final_model_prediction > pcut,1,0)
+table(predicted = German_train$predicted , actual = German_train$response)
+```
+
+
+```{r}
+mean(German_train$response!= German_train$predicted)
+```
+
++ The misclassification rate is 0.33 for in sample prediction
+
+
+
+### Out of sample performance 
+
+```{r}
+out_sample_prediction <- predict(model1_back, newdata = German_test, type="response")
+roc.plot(German_test$response == "1",out_sample_prediction)$roc.vol
+```
+```{r}
+pred <- prediction(out_sample_prediction,German_test$response)
+perf <- performance(pred,"tpr","fpr")
+plot(perf,colorize=TRUE)
+```
+
+
+##### Out of sample AUC  0.8147
+
+#### Asymmetric misclassification rate 
+```{r}
+asymmetric_cost(r = German_test$response, pi=out_sample_prediction,pcut)
+```
++ The asymmetric cost is  0.47
+
+```{r}
+German_test$predicted_values <-  ifelse(out_sample_prediction > pcut,1,0)
+table(predicted = German_test$predicted_values , actual = German_test$response)
+```
+
+
+```{r}
+mean(German_test$predicted_values != German_test$response)
+```
+
++ The misclassification rate is  0.336
+
+#### Cross Validation
+
+```{r}
+costfunc  <- function(obs, pred.p){
+    weight1 <- 5   # define the weight for "true=1 but pred=0" (FN)
+    weight0 <- 1    # define the weight for "true=0 but pred=1" (FP)
+    pcut <- 1/6
+    c1 <- (obs==1)&(pred.p < pcut)    # count for "true=1 but pred=0"   (FN)
+    c0 <- (obs==0)&(pred.p >= pcut)   # count for "true=0 but pred=1"   (FP)
+    cost <- mean(weight1*c1 + weight0*c0)  # misclassification with weight
+    return(cost) 
+}
+
+
+model_full_german <- glm(response~., family = binomial , data = German)
+cv_glm_german <- cv.glm(data = German, glmfit = model_full_german,  cost=costfunc,K = 5)
+cv_glm_german$delta[2]
+```
+
+```{r}
+pred_german <- predict(model_full_german,newdata= German, type ="response")
+roc.plot(German$response == "1",pred_german)$roc.vol
+```
+
++ The AUC for cross validation is 0.833
+
+
+```{r}
+library(ROCR)
+pred = prediction(pred_german, German$response)
+perf = performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+
+
+### Cart Classification tree
+
+```{r}
+german_rpart <- rpart(formula = response ~ ., data = German_train, method = "class")
+prp(german_rpart)
+```
+
+```{r}
+plotcp(german_rpart)
+```
+
+
+```{r}
+german_prune <- prune(german_rpart, cp =0.027)
+```
+
+
+
+```{r}
+prp(german_prune)
+```
+
+
+#### AUC, ROC and misclassification of Classification tree
+
+```{r}
+# In sample
+credit_train.pred.tree1<- predict(german_rpart, German_train, type="class")
+table(German_train$response, credit_train.pred.tree1, dnn=c("Truth","Predicted"))
+```
+
+```{r}
+mean(German_train$response!= credit_train.pred.tree1)
+```
+
+
+```{r}
+#Out of sample
+# german_rpart1 <- rpart(formula = response ~ . , data =German_train, method = "class")
+# 
+# credit_test_prob_rpart <- predict(german_rpart1,German_test, type="class")
+# table(German_test$response, credit_test_prob_rpart, dnn=c("Truth","Predicted"))
+```
+
+
+```{r}
+#Out of sample missclassification
+# mean(German_test$response!= credit_test_prob_rpart)
+```
+
+```{r}
+# library(ROCR)
+# credit_test_prob_rpart = predict(german_rpart, German_test, type="prob")
+# pred = prediction(credit_test_prob_rpart[,2], German_test$response)
+# perf = performance(pred, "tpr", "fpr")
+# plot(perf, colorize=TRUE)
+```
+
+```{r}
+# slot(performance(pred, "auc"), "y.values")[[1]]
+```
+
+## Monte Carlo
+
+```{r}
+set.seed(14023799)
+x1 <- runif(500,0,1)
+x2 <- rep(c(1,0),250)
+z <- -1.1 + 5 * x1 -0.4 * x2
+p <- 1/(1 + exp(-z))
+```
+
+```{r message=FALSE, warning=FALSE}
+library(pROC)
+betaMatrix <- matrix(NA,100,3)
+deviance <- c()
+AUC <- c()
+
+for(j in 1:100){
+  y <- rbinom(500, 1, p)
+  df <- as.data.frame(cbind(y, x1, x2))
+  glm.out <- glm(y ~ ., data = df, family = binomial(link = "logit"))
+  betaMatrix[j,] <- glm.out$coefficients
+  mysummary <- summary(glm.out)
+  deviance[j] <- mysummary$deviance
+  pred_logit <- predict(glm.out, type = "response")
+  AUC[j] <- auc(df$y, pred_logit)
+}
+```
+
+
+```{r}
+#part iii) compute MSE bias etc
+bmean <- apply(betaMatrix,2,mean)
+bvar <- apply(betaMatrix,2,var)
+bias <- bmean - c(-1.1,5,-0.4)
+bmse <- bias^2 + bvar
+
+
+bmean
+bvar
+bias
+bmse
+```
+
+```{r}
+avg_resd_dev <- mean(deviance)
+avg_AUC <- mean(AUC)
+avg_resd_dev
+avg_AUC
+```
+
+
+```{r}
+boxplot(AUC, main="Box plot of AUC")
+```
+
+```{r}
+boxplot(deviance, main="Box plot of mean residual deviance")
+```
+
+### Replication with new sample size
+
+```{r}
+x1 <- runif(5000,0,1)
+x2 <- rep(c(1,0),2500)
+z <- -1.1 + 5 * x1 -0.4 * x2
+p <- 1/(1 + exp(-z))
+```
+
+```{r message=FALSE, warning=FALSE}
+library(pROC)
+betaMatrix <- matrix(NA,100,3)
+deviance <- c()
+AUC <- c()
+
+for(j in 1:100){
+  y <- rbinom(5000, 1, p)
+  df <- as.data.frame(cbind(y, x1, x2))
+  glm.out <- glm(y ~ ., data = df, family = binomial(link = "logit"))
+  betaMatrix[j,] <- glm.out$coefficients
+  mysummary <- summary(glm.out)
+  deviance[j] <- mysummary$deviance
+  pred_logit <- predict(glm.out, type = "response")
+  AUC[j] <- auc(df$y, pred_logit)
+}
+```
+
+
+```{r}
+#part iii) compute MSE bias etc
+bmean <- apply(betaMatrix,2,mean)
+bvar <- apply(betaMatrix,2,var)
+bias <- bmean - c(-1.1,5,-0.4)
+bmse <- bias^2 + bvar
+
+
+bmean
+bvar
+bias
+bmse
+```
+
+```{r}
+avg_resd_dev <- mean(deviance)
+avg_AUC <- mean(AUC)
+avg_resd_dev
+avg_AUC
+```
+
+```{r}
+boxplot(deviance, main = "Box plot of mean residual deviance")
+```
+
+```{r}
+boxplot(AUC, main = "Box plot of AUC")
+```
+
+
