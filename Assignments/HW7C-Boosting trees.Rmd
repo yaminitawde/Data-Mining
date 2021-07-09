@@ -1,0 +1,98 @@
+### Data Mining II
+### Yamini Tawde
+
+## 7C Boosting trees
+## Advanced Tree Models – Boosting Trees
+
+```{r}
+# load Boston data
+set.seed(14023799)
+library(MASS)
+data(Boston)
+index <- sample(nrow(Boston),nrow(Boston)*0.60)
+boston_train <- Boston[index,]
+boston_test <- Boston[-index,]
+
+# load credit card data
+credit_data <- read.csv(file = "https://xiaoruizhu.github.io/Data-Mining-R/lecture/data/credit_default.csv", header=T)
+# convert categorical variables
+credit_data$SEX<- as.factor(credit_data$SEX)
+credit_data$EDUCATION<- as.factor(credit_data$EDUCATION)
+credit_data$MARRIAGE<- as.factor(credit_data$MARRIAGE)
+# random splitting
+index <- sample(nrow(credit_data),nrow(credit_data)*0.60)
+credit_train = credit_data[index,]
+credit_test = credit_data[-index,]
+```
+
+**1 Boosting**
+
+**1.1 Boosting for regression trees**
+
+
+```{r}
+library(gbm)
+# ?gbm
+boston_boost<- gbm(formula = medv~., 
+                   data = boston_train, 
+                   distribution = "gaussian", 
+                   n.trees = 10000, 
+                   shrinkage = 0.01, 
+                   interaction.depth = 8)
+summary(boston_boost)
+```
+
+```{r}
+par(mfrow=c(1,2))
+plot(boston_boost, i="lstat")
+plot(boston_boost, i="rm")
+```
+
+## Exercise 7C 
+Apply Boosting Trees with n.trees=10000 on the Boston housing data to calculate the MSPE.
+
+**Prediction on testing sample.**
+
+```{r}
+boston_boost_pred_test<- predict(boston_boost, boston_test, n.trees = 10000)
+mean((boston_test$medv-boston_boost_pred_test)^2)
+```
+**The MSPE for Boston housing data with n.trees = 1000 is 11.282**
+
+```{r}
+ntree <- seq(100, 10000, 100)
+test.err <- rep(0, 13)
+
+predmat <- predict(boston_boost, newdata = boston_test, n.trees = ntree)
+err <- apply((predmat-boston_test$medv)^2, 2, mean)
+plot(ntree, err, type = 'l', col=2, lwd=2, xlab = "n.trees", ylab = "Test MSE")
+abline(h=min(test.err), lty=2)
+```
+
+**1.2 Boosting for classification trees**
+
+```{r message=FALSE, warning=FALSE}
+library(adabag)
+library(ROCR)
+credit_train$default.payment.next.month= as.factor(credit_train$default.payment.next.month)
+credit_boost= boosting(default.payment.next.month~., data = credit_train, boos = T)
+save(credit_boost, file = "credit_boost.Rdata")
+
+# Training AUC
+pred_credit_boost= predict(credit_boost, newdata = credit_train)
+pred <- prediction(pred_credit_boost$prob[,2], credit_train$default.payment.next.month)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+
+pred_credit_boost= predict(credit_boost, newdata = credit_test)
+# Testing AUC
+pred <- prediction(pred_credit_boost$prob[,2], credit_test$default.payment.next.month)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+
+

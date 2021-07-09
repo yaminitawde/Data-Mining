@@ -1,0 +1,83 @@
+### Data Mining II
+### Yamini Tawde
+
+## 7A Bagging trees
+### Advanced Tree Models – Bagging Tree
+
+```{r}
+set.seed(14023799)
+# load Boston data
+library(MASS)
+data(Boston)
+index <- sample(nrow(Boston),nrow(Boston)*0.60)
+boston_train <- Boston[index,]
+boston_test <- Boston[-index,]
+```
+
+
+```{r}
+set.seed(14023799)
+# load credit card data
+credit_data <- read.csv(file = "https://xiaoruizhu.github.io/Data-Mining-R/lecture/data/credit_default.csv", header=T)
+# convert categorical variables
+credit_data$SEX<- as.factor(credit_data$SEX)
+credit_data$EDUCATION<- as.factor(credit_data$EDUCATION)
+credit_data$MARRIAGE<- as.factor(credit_data$MARRIAGE)
+# random splitting
+index <- sample(nrow(credit_data),nrow(credit_data)*0.60)
+credit_train = credit_data[index,]
+credit_test = credit_data[-index,]
+```
+
+
+**1 Bagging**
+
+```{r}
+library(ipred)
+```
+
+**1.1 Bagging for regression tree**
+```{r}
+boston_bag<- bagging(formula = medv~., 
+                     data = boston_train, 
+                     nbagg=100)
+boston_bag
+```
+
+**Prediction on testing sample**
+```{r}
+boston_bag_pred<- predict(boston_bag, newdata = boston_test)
+mean((boston_test$medv-boston_bag_pred)^2)
+```
+**Comparing with a single tree**
+```{r}
+library(rpart)
+boston_tree<- rpart(formula = medv~., 
+                    data = boston_train)
+boston_tree_pred<- predict(boston_tree, newdata = boston_test)
+mean((boston_test$medv-boston_tree_pred)^2)
+```
+
+
+**How many trees are good?**
+```{r}
+ntree<- c(1, 3, 5, seq(10, 200, 10))
+MSE_test<- rep(0, length(ntree))
+for(i in 1:length(ntree)){
+  boston_bag1<- bagging(medv~., data = boston_train, nbagg=ntree[i])
+  boston_bag_pred1<- predict(boston_bag1, newdata = boston_test)
+  MSE_test[i]<- mean((boston_test$medv-boston_bag_pred1)^2)
+}
+plot(ntree, MSE_test, type = 'l', col=2, lwd=2, xaxt="n")
+axis(1, at = ntree, las=1)
+```
+**1.2 Out-of-bag (OOB) prediction**
+
+```{r}
+boston_bag_oob<- bagging(formula = medv~., 
+                         data = boston_train, 
+                         coob=T, 
+                         nbagg=100)
+boston_bag_oob
+```
+

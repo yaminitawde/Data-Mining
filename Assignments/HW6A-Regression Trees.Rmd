@@ -1,0 +1,102 @@
+## 6A Lab replicates and Exercise
+
+### 1.1 Regression Trees (Boston Housing Data)
+```{r message=FALSE}
+library(MASS) #this data is in MASS package
+set.seed(14023799)
+boston_data <- data(Boston)
+sample_index <- sample(nrow(Boston),nrow(Boston)*0.90)
+boston_train <- Boston[sample_index,]
+boston_test <- Boston[-sample_index,]
+```
+
+```{r message=FALSE, warning=FALSE}
+library(rpart)
+library(rpart.plot)
+```
+
+```{r}
+boston_rpart <- rpart(formula = medv ~ ., data = boston_train)
+```
+
+
+#### 1.1.1 Printing and ploting the tree
+```{r}
+boston_rpart
+```
+```{r}
+prp(boston_rpart,digits = 4, extra = 1)
+```
+
+
+#### Exercise Q1 :Based on the tree model above, what is the predicted median housing price (in thousand) given following information:
+
+**Ans : The predicted median housing price is 27.63**
+
+
++ In-sample prediction
+```{r}
+boston_train_pred_tree = predict(boston_rpart)
+```
+
++ Out-of-sample prediction
+
+```{r}
+boston_test_pred_tree = predict(boston_rpart,boston_test)
+```
+
+#### Exercise Q2:  Calculate the mean squared error (MSE) of the in-sample for this tree model
+
+```{r}
+mean((predict(boston_rpart) - boston_train$medv)^2)
+```
+**Ans : The in-sample MSE for this tree model is 17.148**
+
+
+```{r}
+boston.reg = lm(medv~., data = boston_train)
+boston_test_pred_reg = predict(boston.reg, boston_test)
+mean((boston_test_pred_reg - boston_test$medv)^2)
+```
+
+
+```{r}
+boston_test_pred_rpart = predict(boston_rpart, boston_test)
+mean((boston_test_pred_rpart - boston_test$medv)^2)
+```
+#### Exercise Q3 : Compare this model’s out-of-sample performance with the linear regression model with all variables in it.
+
+**Ans : The tree model's out-of-sample MSPE is 10.406 whereas that of linear regression with all models is 13.187. So the out-of-sample performance is better for tree model as it has lower MSPE value**
+
+
+#### 1.2 Pruning
+
+```{r}
+boston_largetree <- rpart(formula = medv ~ ., data = boston_train, cp = 0.001)
+```
+
+```{r}
+prp(boston_largetree)
+```
+
+```{r}
+plotcp(boston_largetree)
+```
+
+
+```{r}
+printcp(boston_largetree)
+```
+
+```{r}
+sum((boston_train$medv - mean(boston_train$medv))^2)/nrow(boston_train)
+```
+
+```{r}
+mean((predict(boston_largetree) - boston_train$medv)^2)
+```
+
+```{r}
+prune(boston_largetree, cp = 0.008)
+```
+

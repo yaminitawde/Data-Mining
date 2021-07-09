@@ -1,0 +1,119 @@
+### Data Mining II
+### Yamini Tawde
+
+## 7B Random forests
+## Advanced Tree Models – Random Forests
+
+```{r}
+library(MASS)
+data(Boston)
+set.seed(14023799)
+index <- sample(nrow(Boston),nrow(Boston)*0.9)
+boston_train <- Boston[index,]
+boston_test <- Boston[-index,]
+```
+
+**1 Random Forests**
+
+**1.1 Random Forest for Regression**
+
+```{r}
+library(randomForest)
+boston_rf<- randomForest(medv~., data = boston_train, importance=TRUE)
+boston_rf
+```
+
+```{r}
+mod_rf <- randomForest(medv~., data=boston_train, 
+                       importance=TRUE, ntree=500)
+```
+
+```{r}
+boston_rf$importance
+```
+
+```{r}
+mod_rf$importance
+```
+
+```{r}
+plot(boston_rf$mse, type='l', col=2, lwd=2, xlab = "ntree", ylab = "OOB Error")
+```
+
+```{r}
+plot(mod_rf$mse, type='l', col=2, lwd=2, xlab = "ntree", ylab = "OOB Error")
+```
+
+**Prediction on the testing sample**
+```{r}
+boston_rf_pred<- predict(boston_rf, boston_test)
+mean((boston_test$medv-boston_rf_pred)^2)
+```
+
+## Exercise 7B 
+
+Apply random forests on the Boston housing data
+Draw this type of plot below, the MSE of random forests with different (mtry) number of variables randomly sampled as candidates at each split.
+
+```{r}
+oob_err <- rep(0, 13)
+test.err <- rep(0, 13)
+for(i in 1:13){
+  fit<- randomForest(medv~., data = boston_train, mtry=i)
+  oob_err[i]<- fit$mse[500]
+  test.err[i]<- mean((boston_test$medv-predict(fit, boston_test))^2)
+  cat(i, " ")
+}
+```
+```{r}
+matplot(cbind(test.err, oob_err), pch=15, col = c("red", "blue"), type = "b", ylab = "MSE", xlab = "mtry")
+legend("topright", legend = c("test Error", "OOB Error"), pch = 15, col = c("red", "blue"))
+```
+
+**1.2 Random Forest for Classification**
+
+
+```{r}
+# load credit card data
+credit_data <- read.csv(file = "https://xiaoruizhu.github.io/Data-Mining-R/lecture/data/credit_default.csv", header=T)
+# convert categorical variables
+credit_data$SEX<- as.factor(credit_data$SEX)
+credit_data$EDUCATION<- as.factor(credit_data$EDUCATION)
+credit_data$MARRIAGE<- as.factor(credit_data$MARRIAGE)
+# random splitting
+set.seed(14023799)
+index <- sample(nrow(credit_data),nrow(credit_data)*0.9)
+credit_train = credit_data[index,]
+credit_test = credit_data[-index,]
+
+credit_rf <- randomForest(as.factor(default.payment.next.month)~., 
+                          data = credit_train,
+                          importance=TRUE, ntree=500)
+credit_rf
+```
+
+```{r}
+plot(credit_rf, lwd=rep(2, 3))
+legend("right", legend = c("OOB Error", "FPR", "FNR"), lwd=rep(2, 3), lty = c(1,2,3), col = c("black", "red", "green"))
+```
+**ROC curve and AUC can be obtained based on the probability prediction**
+```{r}
+credit_rf_pred <- predict(credit_rf, type = "prob")[,2]
+library(ROCR)
+pred <- prediction(credit_rf_pred, credit_train$default.payment.next.month)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+**Create the confusion matrix based on the cutoff probability from asymmetric cost (pcut=1/6)**
+```{r}
+## out-of-sample
+pcut <- 1/6
+credit_rf_pred_test <- predict(credit_rf, newdata=credit_test, type = "prob")[,2]
+credit_rf_class_test <- (credit_rf_pred_test>pcut)*1
+table(credit_test$default.payment.next.month, credit_rf_class_test, dnn = c("True", "Pred"))
+```
+

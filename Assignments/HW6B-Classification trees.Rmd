@@ -1,0 +1,164 @@
+## 6B Lab replicates and Exercise
+
+#### 1 CART: classification and regression tree
+
+##### 1.1 Classification Trees (Credit Card Default data)
+
+```{r message=FALSE, warning=FALSE}
+library(rpart)
+library(rpart.plot)
+set.seed(14023799)
+```
+
+```{r message=FALSE, warning=FALSE}
+credit_data <- read.csv(file = "https://xiaoruizhu.github.io/Data-Mining-R/lecture/data/credit_default.csv", header=T)
+
+# rename
+library(dplyr)
+```
+
+
+```{r}
+credit_data<- rename(credit_data, default=default.payment.next.month)
+# convert categorical data to factor
+credit_data$SEX<- as.factor(credit_data$SEX)
+credit_data$EDUCATION<- as.factor(credit_data$EDUCATION)
+credit_data$MARRIAGE<- as.factor(credit_data$MARRIAGE)
+
+index <- sample(nrow(credit_data),nrow(credit_data)*0.80)
+credit_train = credit_data[index,]
+credit_test = credit_data[-index,]
+
+credit_rpart0 <- rpart(formula = default ~ ., data = credit_train, method = "class")
+
+credit_rpart <- rpart(formula = default ~ . , data = credit_train, method = "class", parms = list(loss=matrix(c(0,5,1,0), nrow = 2)))
+```
+
+
+```{r}
+pred0 <- predict(credit_rpart0, type="class")
+table(credit_train$default, pred0, dnn = c("True", "Pred"))
+```
+
+
+#### 1.1.1 Printing and ploting the tree
+
+```{r}
+credit_rpart
+```
+
+```{r}
+prp(credit_rpart, extra = 1)
+```
+
+
+#### 1.1.2 Prediction using classification trees
+
++ In-sample prediction
+```{r}
+credit_train.pred.tree1<- predict(credit_rpart, credit_train, type="class")
+table(credit_train$default, credit_train.pred.tree1, dnn=c("Truth","Predicted"))
+```
+
+### Exercise Q1: For the credit card default data, calculate the out-of-sample confusion matrix    
+
+```{r}
+#Predicted Class
+credit_test.pred.tree1<- predict(credit_rpart, credit_test, type="class")
+table(credit_test$default, credit_test.pred.tree1, dnn=c("Truth","Predicted"))
+```
+
+
+
+```{r}
+cost <- function(r, phat){
+  weight1 <- 5
+  weight0 <- 1
+  pcut <- weight0/(weight1+weight0) 
+  c1 <- (r==1)&(phat<pcut) #logical vector - true if actual 1 but predict 0
+  c0 <-(r==0)&(phat>pcut) #logical vector - true if actual 0 but predict 1
+  return(mean(weight1*c1+weight0*c0))
+}
+
+cost(credit_train$default, predict(credit_rpart, credit_train, type="prob"))
+```
+
+#### 1.1.3 Calculate the actual cost using a self-defined cost function.
+
+```{r}
+cost(credit_test$default,  predict(credit_rpart, credit_test, type="prob"))
+```
+
+#### 1.1.4 Comparing this classification tree with logistic regression
+
+```{r}
+#Fit logistic regression model
+credit_glm <- glm(default~., 
+                  data = credit_train, 
+                  family=binomial)
+#Get binary prediction
+credit_test_pred_glm <- predict(credit_glm, credit_test, type="response")
+#Calculate cost using test set
+cost(credit_test$default, credit_test_pred_glm)
+```
+
+```{r}
+#Confusion matrix
+table(credit_test$default, as.numeric(credit_test_pred_glm>1/6), dnn=c("Truth","Predicted"))
+```
+
+
+```{r}
+#Get binary prediction
+credit_train_pred_glm <- predict(credit_glm, credit_train, type="response")
+#Calculate cost using test set
+cost(credit_train$default, credit_train_pred_glm)
+```
+### Exercise Q2: If the cost ratio of false negative to false positive is 5 to 1, calculate the out-of-sample asymmetric cost.
+
+```{r}
+credit_test.pred.tree1<- predict(credit_rpart, credit_test, type="prob")
+cost(credit_test$default, credit_test.pred.tree1)
+```
+
+**The out-of-sample asymmetric cost is 0.673**
+
+#### 1.1.5 ROC Curve and Cut-off Probability for Classification trees
+```{r}
+credit_rpart <- rpart(formula = default ~ .,
+                      data = credit_train, 
+                      method = "class",
+                      parms = list(loss=matrix(c(0,5,1,0), nrow = 2)))
+#Probability of getting 1
+credit_test_prob_rpart = predict(credit_rpart, credit_test, type="prob")
+```
+
+```{r}
+library(ROCR)
+```
+
+```{r}
+pred = prediction(credit_test_prob_rpart[,2], credit_test$default)
+perf = performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+
+```{r}
+slot(performance(pred, "auc"), "y.values")[[1]]
+```
+```{r}
+credit_test_pred_rpart = as.numeric(credit_test_prob_rpart[,2] > 1/(5+1))
+table(credit_test$default, credit_test_pred_rpart, dnn=c("Truth","Predicted"))
+```
+
+#### Exercise: Draw the ROC curve for training sample.
+
+```{r}
+credit_train_prob_rpart = predict(credit_rpart, credit_train, type="prob")
+pred = prediction(credit_train_prob_rpart[,2], credit_train$default)
+perf = performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+
+
+

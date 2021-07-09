@@ -1,0 +1,137 @@
+### Data Mining II
+### Yamini Tawde
+
+### Nonparametric Smoothing: Moving Beyond Linearity
+
+#### 1 mcycle motorcycle accident dataset
+```{r}
+library(MASS)
+data('mcycle')
+str(mcycle)
+summary(mcycle)
+```
+
+```{r}
+# Rename the variables for ease of usage
+Y <- mcycle$accel
+X <- mcycle$times
+
+#Scatterplot
+plot(Y~X, xlab="time",ylab="Acceleration", main="Scatterplot of Acceleration against Time")
+```
+
+#### 2 Simple Linear Regression
+```{r}
+lm_mod <- lm(Y~X, data= mcycle)
+summary(lm_mod)
+```
+
+**Fitted Regression Line**
+```{r}
+plot(X, Y, xlab="Times", ylab="Acceleration", main="Simple Linear Regression Line")
+abline(lm_mod, col="blue", lwd = 1)
+```
+
+#### 3 Polynomial Regression
+
+**3.1 Quadratic**
+
+```{r}
+quad_mod <- lm(Y~X+I(X^2), data=mcycle) 
+summary(quad_mod)
+```
+
+```{r}
+plot(X ,Y ,xlab="Times", main = "Quadratic",ylab="Acceleration",cex=.5)
+lines(X,quad_mod$fitted.values, col="blue", lwd = 1)
+```
+
+**Is this model superior to the simple linear regression model?**
+```{r}
+anova(lm_mod,quad_mod)
+```
+
+**3.2 Fifth-degree Polynomial**
+
+```{r}
+poly_mod <- lm(Y~poly(X,5,raw=T),data=mcycle) 
+summary(poly_mod)
+```
+
+```{r}
+plot(X ,Y ,xlab="Times", main = "Fifth-degree polynomial",ylab="Acceleration",cex=.5)
+lines(X,poly_mod$fitted.values, col="blue", lwd = 1)
+```
+
+
+#### 4 Splines
+
+**4.1 Regression Splines**
+
+
+```{r}
+library (splines)
+reg_sp <- lm(Y~bs(X),data=mcycle)
+summary(reg_sp)
+```
+
+```{r}
+plot(X ,Y ,xlab="Times", main = "Regression Spline",ylab="Acceleration",cex=.5)
+lines(X,reg_sp$fitted.values, col="blue", lwd = 1)
+
+conf_interval <- predict(reg_sp, interval="confidence",
+                         level = 0.95)
+lines(X, conf_interval[,2], col="red", lty=2)
+lines(X, conf_interval[,3], col="red", lty=2)
+```
+
+```{r}
+reg_sp2=lm(Y~bs(X,df=10),data=mcycle) 
+
+plot(X ,Y ,xlab="Times", main = "Regression Spline with df=10",ylab="Acceleration",cex=.5)
+lines(X,reg_sp2$fitted.values, col="blue", lwd = 1)
+
+conf_interval <- predict(reg_sp2, interval="confidence",
+                         level = 0.95)
+lines(X, conf_interval[,2], col="red", lty=2)
+lines(X, conf_interval[,3], col="red", lty=2)
+```
+
+**4.2 Natural Cubic Splines**
+
+```{r}
+#First: Natural Spline- pre-specified degree of freedom=4
+fit2=lm(Y~ns(X,df=4),data=mcycle) 
+plot(X ,Y,main= "Natural Cubic Spline with df=4", xlab="Times", ylab="Acceleration") 
+lines(X, fit2$fitted.values)
+
+conf_interval <- predict(fit2, interval="confidence",
+                         level = 0.95)
+lines(X, conf_interval[,2], col="red", lty=2)
+lines(X, conf_interval[,3], col="red", lty=2)
+```
+
+```{r}
+fit2c=lm(Y~ns(X,df=10),data=mcycle) 
+
+plot(X ,Y , main= "Natural Cubic Spline with df=10", xlab="Times", ylab="Acceleration") 
+lines(X, fit2c$fitted.values)
+
+conf_interval <- predict(fit2c, interval="confidence",
+                         level = 0.95)
+lines(X, conf_interval[,2], col="red", lty=2)
+lines(X, conf_interval[,3], col="red", lty=2)
+```
+
+```{r}
+fit2d=lm(Y~ns(X,df=20),data=mcycle) 
+
+plot(X ,Y, main= "Natural Cubic Spline with df=20", xlab="Times", ylab="Acceleration") 
+lines(X, fit2d$fitted.values)
+
+conf_interval <- predict(fit2d, interval="confidence",
+                         level = 0.95)
+lines(X, conf_interval[,2], col="red", lty=2)
+lines(X, conf_interval[,3], col="red", lty=2)
+```
+
